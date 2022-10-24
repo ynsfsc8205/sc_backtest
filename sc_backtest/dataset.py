@@ -1,5 +1,7 @@
+import numpy as np
 import pandas as pd
 import os
+import datetime
 
 
 def get_data(data_name='adj_close_price',
@@ -33,19 +35,71 @@ def get_data(data_name='adj_close_price',
     output.index = pd.to_datetime(output.index)
     output = output.loc[pd.to_datetime(start_time):pd.to_datetime(end_time), columns]
 
-    if frequency <= 240 and frequency != 1:
+    if frequency <= 120 and frequency != 1:
+        output_mn = output.copy()
+        output_mn[output_mn.index.time > datetime.time(12, 0)] = np.nan
+        output_mn.dropna(inplace=True)
+        output_af = output.copy()
+        output_af[output_af.index.time < datetime.time(12, 0)] = np.nan
+        output_af.dropna(inplace=True)
         if data_name in ['adj_close_price', 'openint']:
-            output = output.resample(f'{int(frequency)}T', label='right', closed='right').last().dropna()
+            output_mn = output_mn.resample(f'{int(frequency)}T',
+                                           label='right',
+                                           closed='right',
+                                           origin=output_mn.index[frequency-1]).last(min_count=1).dropna()
+            output_af = output_af.resample(f'{int(frequency)}T',
+                                           label='right',
+                                           closed='right',
+                                           origin=output_af.index[frequency-1]).last(min_count=1).dropna()
         elif data_name in ['adj_open_price']:
-            output = output.resample(f'{int(frequency)}T', label='right', closed='right').first().dropna()
+            output_mn = output_mn.resample(f'{int(frequency)}T',
+                                           label='right',
+                                           closed='right',
+                                           origin=output_mn.index[frequency-1]).first(min_count=1).dropna()
+            output_af = output_af.resample(f'{int(frequency)}T',
+                                           label='right',
+                                           closed='right',
+                                           origin=output_af.index[frequency-1]).first(min_count=1).dropna()
         elif data_name in ['adj_high_price']:
-            output = output.resample(f'{int(frequency)}T', label='right', closed='right').max().dropna()
+            output_mn = output_mn.resample(f'{int(frequency)}T',
+                                           label='right',
+                                           closed='right',
+                                           origin=output_mn.index[frequency-1]).max(min_count=1).dropna()
+            output_af = output_af.resample(f'{int(frequency)}T',
+                                           label='right',
+                                           closed='right',
+                                           origin=output_af.index[frequency-1]).max(min_count=1).dropna()
         elif data_name in ['adj_low_price']:
-            output = output.resample(f'{int(frequency)}T', label='right', closed='right').min().dropna()
+            output_mn = output_mn.resample(f'{int(frequency)}T',
+                                           label='right',
+                                           closed='right',
+                                           origin=output_mn.index[frequency-1]).min(min_count=1).dropna()
+            output_af = output_af.resample(f'{int(frequency)}T',
+                                           label='right',
+                                           closed='right',
+                                           origin=output_af.index[frequency-1]).min(min_count=1).dropna()
         elif data_name in ['volume', 'value']:
-            output = output.resample(f'{int(frequency)}T', label='right', closed='right').sum().dropna()
+            output_mn = output_mn.resample(f'{int(frequency)}T',
+                                           label='right',
+                                           closed='right',
+                                           origin=output_mn.index[frequency-1]).sum(min_count=1).dropna()
+            output_af = output_af.resample(f'{int(frequency)}T',
+                                           label='right',
+                                           closed='right',
+                                           origin=output_af.index[frequency-1]).sum(min_count=1).dropna()
+        output = pd.concat([output_mn, output_af], axis=0).sort_index()
 
     if frequency == 240:
-        output.index = pd.to_datetime(output.index.date)
+        if data_name in ['adj_close_price', 'openint']:
+            output = output.resample('1d', closed='right').last(min_count=1).dropna()
+        elif data_name in ['adj_open_price']:
+            output = output.resample('1d', closed='right').first(min_count=1).dropna()
+        elif data_name in ['adj_high_price']:
+            output = output.resample('1d', closed='right').max(min_count=1).dropna()
+        elif data_name in ['adj_low_price']:
+            output = output.resample('1d', closed='right').min(min_count=1).dropna()
+        elif data_name in ['volume', 'value']:
+            output = output.resample('1d', closed='right').sum(min_count=1).dropna()
+        output.index = pd.to_datetime(output.index)
 
     return output
